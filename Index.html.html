@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>J.A.R.V.I.S. HUD</title>
+<style>
+:root{--bg:#02060d;--fg:#bfefff;--cy:#22d3ee;--dim:#0e7490;--panel:rgba(8,40,60,.55);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;overflow:hidden;touch-action:none}
+body{background:radial-gradient(circle at 50% 45%,#06223a,var(--bg) 70%)}
+#top{position:fixed;left:0;right:0;top:0;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;display:flex;justify-content:space-between;align-items:center;letter-spacing:.25em;font-size:12px;color:var(--cy);z-index:5}
+button{background:transparent;color:var(--cy);border:1px solid var(--cy);padding:8px 12px;border-radius:4px;letter-spacing:.1em;font-size:12px}
+#core{position:absolute;left:50%;top:50%;width:min(60vw,260px);aspect-ratio:1;transform:translate(-50%,-50%);pointer-events:none}
+#core svg{width:100%;height:100%}
+.spin{transform-origin:50% 50%;animation:s 14s linear infinite}.spin2{transform-origin:50% 50%;animation:s 9s linear infinite reverse}
+@keyframes s{to{transform:rotate(360deg)}}
+.p{position:absolute;width:150px;padding:10px 12px;background:var(--panel);border:1px solid var(--dim);border-radius:6px;backdrop-filter:blur(4px);cursor:grab;user-select:none;touch-action:none;box-shadow:0 0 14px rgba(34,211,238,.15)}
+.p h4{margin:0 0 6px;font-size:10px;letter-spacing:.2em;color:var(--cy);font-weight:600}
+.p .v{font-size:22px;font-weight:300}
+.p small{color:var(--dim);font-size:11px}
+.bar{height:4px;background:#0b3a52;margin-top:6px}.bar i{display:block;height:100%;background:var(--cy);width:50%;transition:width .8s}
+.p.on{border-color:#fff;box-shadow:0 0 22px var(--cy)}
+#cur{position:fixed;width:18px;height:18px;margin:-9px 0 0 -9px;border:2px solid var(--cy);border-radius:50%;pointer-events:none;display:none;z-index:9;transition:background .1s}
+#cur.pin{background:var(--cy)}
+#cam{position:fixed;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));width:96px;border:1px solid var(--dim);opacity:.6;transform:scaleX(-1);display:none;z-index:6}
+#msg{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));font-size:11px;color:var(--dim);max-width:60vw;z-index:6}
+</style>
+</head>
+<body>
+<div id="top"><span>J.A.R.V.I.S.</span><button id="btn">ACTIVAR MANOS</button></div>
+<div id="core"><svg viewBox="0 0 200 200" fill="none" stroke="#22d3ee">
+<circle cx="100" cy="100" r="92" stroke-width="1" opacity=".4"/>
+<g class="spin"><circle cx="100" cy="100" r="80" stroke-width="3" stroke-dasharray="30 12"/></g>
+<g class="spin2"><circle cx="100" cy="100" r="62" stroke-width="2" stroke-dasharray="6 8"/></g>
+<circle cx="100" cy="100" r="40" stroke-width="2"/><circle cx="100" cy="100" r="18" fill="#22d3ee" opacity=".85"/></svg></div>
+
+<div class="p" style="left:6%;top:16%"><h4>HORA</h4><div class="v" id="t">--:--</div><small id="d"></small></div>
+<div class="p" style="right:6%;top:16%"><h4>SISTEMA</h4><div class="v">CPU <span id="cpu">42</span>%</div><div class="bar"><i id="cb"></i></div></div>
+<div class="p" style="left:6%;bottom:22%"><h4>ESTADO</h4><div class="v">EN LÍNEA</div><small>Todos los sistemas operativos</small></div>
+<div class="p" style="right:6%;bottom:22%"><h4>ENERGÍA</h4><div class="v">98%</div><div class="bar"><i style="width:98%"></i></div></div>
+
+<div id="cur"></div>
+<video id="cam" playsinline muted></video>
+<div id="msg">Arrastra los paneles con el dedo o el ratón. Con las manos: mueve el índice y pellizca para agarrar.</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js"></script>
+<script>
+const $=s=>document.querySelector(s), panels=[...document.querySelectorAll('.p')], msg=$('#msg');
+function tick(){const n=new Date();$('#t').textContent=n.toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});$('#d').textContent=n.toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long'});const c=30+Math.round(Math.random()*40);$('#cpu').textContent=c;$('#cb').style.width=c+'%'}
+tick();setInterval(tick,1500);
+
+// Arrastre normal (ratón / táctil)
+let z=10;
+panels.forEach(p=>{let ox,oy,go=false;
+ p.addEventListener('pointerdown',e=>{go=true;p.setPointerCapture(e.pointerId);ox=e.clientX-p.offsetLeft;oy=e.clientY-p.offsetTop;p.style.zIndex=++z;p.classList.add('on')});
+ p.addEventListener('pointermove',e=>{if(!go)return;mv(p,e.clientX-ox,e.clientY-oy)});
+ p.addEventListener('pointerup',()=>{go=false;p.classList.remove('on')});});
+function mv(p,x,y){p.style.right='auto';p.style.bottom='auto';p.style.left=Math.max(0,Math.min(innerWidth-p.offsetWidth,x))+'px';p.style.top=Math.max(0,Math.min(innerHeight-p.offsetHeight,y))+'px'}
+
+// Control por manos
+let held=null,off=[0,0],sx=0,sy=0;
+function onHands(r){
+ const cur=$('#cur');
+ if(!r.multiHandLandmarks||!r.multiHandLandmarks.length){cur.style.display='none';if(held){held.classList.remove('on');held=null}return}
+ const l=r.multiHandLandmarks[0],i=l[8],t=l[4];
+ const x=(1-i.x)*innerWidth,y=i.y*innerHeight;
+ sx+=(x-sx)*.45;sy+=(y-sy)*.45; // suavizado
+ const pinch=Math.hypot(i.x-t.x,i.y-t.y)<.06;
+ cur.style.display='block';cur.style.left=sx+'px';cur.style.top=sy+'px';cur.classList.toggle('pin',pinch);
+ if(pinch&&!held){for(const p of panels){const b=p.getBoundingClientRect();if(sx>b.left-20&&sx<b.right+20&&sy>b.top-20&&sy<b.bottom+20){held=p;off=[sx-b.left,sy-b.top];p.style.zIndex=++z;p.classList.add('on');break}}}
+ if(!pinch&&held){held.classList.remove('on');held=null}
+ if(held)mv(held,sx-off[0],sy-off[1]);
+}
+$('#btn').onclick=async()=>{
+ try{
+  if(typeof Hands==='undefined')throw new Error('No se pudo cargar MediaPipe');
+  const v=$('#cam');
+  v.srcObject=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:480,height:360}});
+  await v.play();v.style.display='block';
+  const h=new Hands({locateFile:f=>'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/'+f});
+  h.setOptions({maxNumHands:1,modelComplexity:0,minDetectionConfidence:.6,minTrackingConfidence:.6});
+  h.onResults(onHands);
+  msg.textContent='Manos activas. Pellizca índice y pulgar sobre un panel para moverlo.';
+  $('#btn').style.display='none';
+  (async function loop(){await h.send({image:v});requestAnimationFrame(loop)})();
+ }catch(e){msg.textContent='No se pudo activar la cámara aquí ('+e.message+'). Descarga el archivo y ábrelo localmente.'}
+};
+</script>
+</body>
+</html>
